@@ -1,0 +1,8 @@
+{
+  "name": "ethara-assignment",
+  "private": true,
+  "scripts": {
+    "build": "npm run build --prefix frontend && npm run build --prefix backend && cp -r frontend/dist/public backend/public",
+    "start": "npm start --prefix backend"
+  }
+}
