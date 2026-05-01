@@ -37,15 +37,13 @@ if (process.env.NODE_ENV === "production") {
   const publicPath = path.resolve(process.cwd(), "public");
   if (fs.existsSync(publicPath)) {
     app.use(express.static(publicPath));
-    app.get("*", (req, res) => {
-      if (!req.path.startsWith("/api")) {
-        res.sendFile(path.join(publicPath, "index.html"));
-      }
+    app.get(/^(?!\/api).*/, (req, res) => {
+      res.sendFile(path.join(publicPath, "index.html"));
     });
   }
 }
 
-// 404
+// 404  
 app.use((req, res) => {
   res.status(404).json({ error: "Not found", path: req.path });
 });
