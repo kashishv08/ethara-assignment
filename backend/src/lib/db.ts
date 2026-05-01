@@ -16,7 +16,6 @@ export function connectDb(): Promise<typeof mongoose> {
   connectionPromise = mongoose
     .connect(uri, {
       serverSelectionTimeoutMS: 15000,
-      dbName: "team_task_manager",
     })
     .then((conn) => {
       logger.info(

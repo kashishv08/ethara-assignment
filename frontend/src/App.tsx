@@ -11,6 +11,7 @@ import Dashboard from "@/pages/Dashboard";
 import ProjectsPage from "@/pages/ProjectsPage";
 import ProjectDetailPage from "@/pages/ProjectDetailPage";
 import MyTasksPage from "@/pages/MyTasksPage";
+import AdminPanel from "@/pages/AdminPanel";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -52,6 +53,11 @@ function Routes() {
       <Route path="/my-tasks">
         <Shell>
           <MyTasksPage />
+        </Shell>
+      </Route>
+      <Route path="/admin">
+        <Shell>
+          <AdminPanel />
         </Shell>
       </Route>
       <Route component={NotFound} />

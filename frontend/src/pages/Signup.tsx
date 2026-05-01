@@ -6,6 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Shield } from "lucide-react";
 
 export default function Signup() {
   const { signup } = useAuth();
@@ -14,13 +22,14 @@ export default function Signup() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState<string>("member");
   const [submitting, setSubmitting] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await signup(name, email, password);
+      await signup(name, email, password, role);
       navigate("/");
     } catch (err) {
       toast({
@@ -104,6 +113,19 @@ export default function Signup() {
                   data-testid="input-password"
                 />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Join as</Label>
+              <Select value={role} onValueChange={setRole}>
+                <SelectTrigger className="pl-9 relative">
+                  <Shield className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="member">Member</SelectItem>
+                  <SelectItem value="admin">Administrator</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <Button
               type="submit"

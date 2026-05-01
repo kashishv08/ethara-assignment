@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import mongoose from "mongoose";
 import { z } from "zod";
 import { requireAuth } from "../middlewares/auth";
+import { checkProjectMembership, isProjectAdmin, isTaskAssignee } from "../middlewares/rbac";
 import { Task, TASK_PRIORITIES, TASK_STATUSES } from "../models/Task";
 import { Project } from "../models/Project";
 import { publicUser } from "../models/User";
@@ -66,46 +67,67 @@ function serializeTask(t: any) {
   };
 }
 
-async function userHasProjectAccess(
-  userId: string,
-  role: string,
-  projectId: string,
-): Promise<boolean> {
-  if (role === "admin") return true;
-  const project = await Project.findById(projectId).select("owner members");
-  if (!project) return false;
-  if (String(project.owner) === userId) return true;
-  return project.members.some((m: any) => String(m) === userId);
-}
-
 router.get("/tasks", requireAuth, async (req, res) => {
   const { projectId, assignee, status } = req.query as Record<string, string>;
   const filter: Record<string, unknown> = {};
 
+  // If projectId is provided, check membership
   if (projectId) {
     if (!mongoose.isValidObjectId(projectId)) {
-      res.status(400).json({ error: "Invalid projectId" });
-      return;
+      return res.status(400).json({ success: false, message: "Invalid projectId", code: 400 });
     }
-    const ok = await userHasProjectAccess(
-      req.user!.sub,
-      req.user!.role,
-      projectId,
-    );
-    if (!ok) {
-      res.status(403).json({ error: "No access to this project" });
-      return;
+    
+    const project = await Project.findById(projectId).select("owner members");
+    if (!project) return res.status(404).json({ success: false, message: "Project not found", code: 404 });
+
+    const userId = req.user!.sub;
+    const isAdmin = req.user!.role === "admin";
+    const isOwner = String(project.owner) === userId;
+    const membership = project.members.find((m: any) => String(m.user) === userId);
+
+    if (!isAdmin && !isOwner && !membership) {
+      return res.status(403).json({ success: false, message: "No access to this project", code: 403 });
     }
+
+    const projectRole = isAdmin || isOwner || (membership && membership.role === "admin") ? "admin" : "member";
     filter["project"] = new mongoose.Types.ObjectId(projectId);
+
+    // Filter tasks if member
+    if (projectRole === "member") {
+      filter["assignee"] = new mongoose.Types.ObjectId(userId);
+    }
   } else {
-    // limit to projects the user can see
+    // Return tasks from all accessible projects
     const accessibleProjects =
       req.user!.role === "admin"
         ? await Project.find().select("_id")
         : await Project.find({
-            $or: [{ owner: req.user!.sub }, { members: req.user!.sub }],
-          }).select("_id");
-    filter["project"] = { $in: accessibleProjects.map((p) => p._id) };
+            $or: [{ owner: req.user!.sub }, { "members.user": req.user!.sub }],
+          }).select("_id members.user members.role");
+
+    const projectIds = accessibleProjects.map((p) => p._id);
+    
+    if (req.user!.role === "admin") {
+      filter["project"] = { $in: projectIds };
+    } else {
+      // Complex filter: tasks where (project is owned) OR (project is member AND assigned to me)
+      const ownedProjectIds = (accessibleProjects as any[])
+        .filter(p => String(p.owner) === req.user!.sub)
+        .map(p => p._id);
+      
+      const memberProjectIds = (accessibleProjects as any[])
+        .filter(p => p.members.some((m: any) => String(m.user) === req.user!.sub && m.role === "member"))
+        .map(p => p._id);
+
+      const adminProjectIds = (accessibleProjects as any[])
+        .filter(p => p.members.some((m: any) => String(m.user) === req.user!.sub && m.role === "admin"))
+        .map(p => p._id);
+
+      filter["$or"] = [
+        { project: { $in: [...ownedProjectIds, ...adminProjectIds] } },
+        { project: { $in: memberProjectIds }, assignee: new mongoose.Types.ObjectId(req.user!.sub) }
+      ];
+    }
   }
 
   if (assignee === "me") {
@@ -127,95 +149,14 @@ router.get("/tasks", requireAuth, async (req, res) => {
   res.json({ tasks: tasks.map(serializeTask) });
 });
 
-router.get("/tasks/summary", requireAuth, async (req, res) => {
-  const userId = req.user!.sub;
-  const accessibleProjects =
-    req.user!.role === "admin"
-      ? await Project.find().select("_id")
-      : await Project.find({
-          $or: [{ owner: userId }, { members: userId }],
-        }).select("_id");
-  const projectIds = accessibleProjects.map((p) => p._id);
-  const now = new Date();
-
-  const [counts, mineCounts, overdue, recent] = await Promise.all([
-    Task.aggregate([
-      { $match: { project: { $in: projectIds } } },
-      { $group: { _id: "$status", count: { $sum: 1 } } },
-    ]),
-    Task.aggregate([
-      {
-        $match: {
-          project: { $in: projectIds },
-          assignee: new mongoose.Types.ObjectId(userId),
-        },
-      },
-      { $group: { _id: "$status", count: { $sum: 1 } } },
-    ]),
-    Task.countDocuments({
-      project: { $in: projectIds },
-      status: { $ne: "done" },
-      dueDate: { $lt: now, $ne: null },
-    }),
-    Task.find({ project: { $in: projectIds } })
-      .sort({ updatedAt: -1 })
-      .limit(8)
-      .populate("assignee")
-      .populate("project")
-      .populate("createdBy"),
-  ]);
-
-  const stats = { todo: 0, in_progress: 0, done: 0, total: 0 };
-  for (const row of counts) {
-    stats.total += row.count;
-    if (row._id in stats) (stats as any)[row._id] = row.count;
-  }
-  const mine = { todo: 0, in_progress: 0, done: 0, total: 0 };
-  for (const row of mineCounts) {
-    mine.total += row.count;
-    if (row._id in mine) (mine as any)[row._id] = row.count;
-  }
-
-  res.json({
-    summary: {
-      total: stats.total,
-      todo: stats.todo,
-      inProgress: stats.in_progress,
-      done: stats.done,
-      overdue,
-      projects: projectIds.length,
-      mine,
-    },
-    recent: recent.map(serializeTask),
-  });
-});
-
-router.post("/tasks", requireAuth, async (req, res) => {
+router.post("/tasks", requireAuth, checkProjectMembership, isProjectAdmin, async (req, res) => {
   const parsed = createTaskSchema.safeParse(req.body);
   if (!parsed.success) {
-    res
-      .status(400)
-      .json({ error: "Invalid input", details: parsed.error.flatten() });
+    res.status(400).json({ success: false, message: "Invalid input", code: 400 });
     return;
   }
   const { projectId, assigneeId, dueDate, ...rest } = parsed.data;
-  const ok = await userHasProjectAccess(
-    req.user!.sub,
-    req.user!.role,
-    projectId,
-  );
-  if (!ok) {
-    res.status(403).json({ error: "No access to this project" });
-    return;
-  }
-  if (req.user!.role !== "admin") {
-    // Members can only create tasks on projects they belong to (already checked).
-    // Members may not assign tasks to others — only to themselves or unassigned.
-    if (assigneeId && assigneeId !== req.user!.sub) {
-      res.status(403).json({ error: "Members can only assign tasks to themselves" });
-      return;
-    }
-  }
+  
   const task = await Task.create({
     ...rest,
     project: new mongoose.Types.ObjectId(projectId),
@@ -223,6 +164,7 @@ router.post("/tasks", requireAuth, async (req, res) => {
     dueDate: dueDate ? new Date(dueDate) : null,
     createdBy: new mongoose.Types.ObjectId(req.user!.sub),
   });
+  
   const populated = await Task.findById(task._id)
     .populate("assignee")
     .populate("project")
@@ -230,97 +172,95 @@ router.post("/tasks", requireAuth, async (req, res) => {
   res.status(201).json({ task: serializeTask(populated) });
 });
 
-router.patch("/tasks/:id", requireAuth, async (req, res) => {
-  const id = req.params["id"];
-  if (!id || !mongoose.isValidObjectId(id)) {
-    res.status(400).json({ error: "Invalid task id" });
-    return;
+router.get("/tasks/:taskId", requireAuth, async (req, res) => {
+  const task = await Task.findById(req.params["taskId"]).populate("assignee").populate("project").populate("createdBy");
+  if (!task) return res.status(404).json({ success: false, message: "Task not found", code: 404 });
+
+  // Access check
+  const project = await Project.findById(task.project).select("owner members");
+  const userId = req.user!.sub;
+  const isAdmin = req.user!.role === "admin";
+  const isOwner = project && String(project.owner) === userId;
+  const membership = project?.members.find((m: any) => String(m.user) === userId);
+
+  if (!isAdmin && !isOwner && !membership) {
+    return res.status(403).json({ success: false, message: "No access to this task", code: 403 });
   }
+
+  const projectRole = isAdmin || isOwner || (membership && membership.role === "admin") ? "admin" : "member";
+  if (projectRole === "member" && String(task.assignee) !== userId) {
+    return res.status(403).json({ success: false, message: "You can only view your own tasks", code: 403 });
+  }
+
+  res.json({ task: serializeTask(task) });
+});
+
+router.patch("/tasks/:taskId", requireAuth, async (req, res) => {
+  const task = await Task.findById(req.params["taskId"]);
+  if (!task) return res.status(404).json({ success: false, message: "Task not found", code: 404 });
+
+  const project = await Project.findById(task.project).select("owner members");
+  const userId = req.user!.sub;
+  const isAdmin = req.user!.role === "admin";
+  const isOwner = project && String(project.owner) === userId;
+  const membership = project?.members.find((m: any) => String(m.user) === userId);
+
+  const projectRole = isAdmin || isOwner || (membership && membership.role === "admin") ? "admin" : "member";
+  const isAssignee = String(task.assignee) === userId;
+
   const parsed = updateTaskSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: "Invalid input" });
-    return;
-  }
-  const task = await Task.findById(id);
-  if (!task) {
-    res.status(404).json({ error: "Task not found" });
-    return;
-  }
-  const ok = await userHasProjectAccess(
-    req.user!.sub,
-    req.user!.role,
-    String(task.project),
-  );
-  if (!ok) {
-    res.status(403).json({ error: "No access to this task" });
-    return;
-  }
+  if (!parsed.success) return res.status(400).json({ success: false, message: "Invalid input", code: 400 });
 
-  // Members can only update tasks assigned to them; admins/owner can update anything
-  if (req.user!.role !== "admin") {
-    const project = await Project.findById(task.project).select("owner");
-    const isOwner = project && String(project.owner) === req.user!.sub;
-    const isAssignee =
-      task.assignee && String(task.assignee) === req.user!.sub;
-    if (!isOwner && !isAssignee) {
-      res
-        .status(403)
-        .json({ error: "Only admins, project owner, or assignee can update task" });
-      return;
+  if (projectRole === "member") {
+    // Members can update details of tasks assigned to them
+    if (!isAssignee) {
+      return res.status(403).json({ success: false, message: "You can only modify your own tasks", code: 403 });
     }
-    // Members cannot reassign a task to someone else
-    if (
-      parsed.data.assigneeId !== undefined &&
-      parsed.data.assigneeId &&
-      parsed.data.assigneeId !== req.user!.sub &&
-      !isOwner
-    ) {
-      res.status(403).json({ error: "Members cannot reassign tasks" });
-      return;
+    
+    const { title, description, status, priority, dueDate } = parsed.data;
+    if (title) task.title = title;
+    if (description !== undefined) task.description = description;
+    if (status) task.status = status;
+    if (priority) task.priority = priority;
+    if (dueDate !== undefined) task.dueDate = dueDate ? new Date(dueDate) : null;
+
+    // Prevent re-assignment by members
+    if (req.body.assigneeId !== undefined && req.body.assigneeId !== userId && req.body.assigneeId !== null) {
+      return res.status(403).json({ success: false, message: "Members cannot re-assign tasks", code: 403 });
+    }
+  } else {
+    // Admin/Owner can update anything
+    const { assigneeId, dueDate, ...rest } = parsed.data;
+    Object.assign(task, rest);
+    if (assigneeId !== undefined) {
+      task.assignee = assigneeId ? new mongoose.Types.ObjectId(assigneeId) as any : null;
+    }
+    if (dueDate !== undefined) {
+      task.dueDate = dueDate ? new Date(dueDate) : null;
     }
   }
 
-  const { assigneeId, dueDate, ...rest } = parsed.data;
-  Object.assign(task, rest);
-  if (assigneeId !== undefined) {
-    task.assignee = assigneeId
-      ? (new mongoose.Types.ObjectId(assigneeId) as any)
-      : null;
-  }
-  if (dueDate !== undefined) {
-    task.dueDate = dueDate ? new Date(dueDate) : null;
-  }
   await task.save();
-  const populated = await Task.findById(task._id)
-    .populate("assignee")
-    .populate("project")
-    .populate("createdBy");
+  const populated = await Task.findById(task._id).populate("assignee").populate("project").populate("createdBy");
   res.json({ task: serializeTask(populated) });
 });
 
-router.delete("/tasks/:id", requireAuth, async (req, res) => {
-  const id = req.params["id"];
-  if (!id || !mongoose.isValidObjectId(id)) {
-    res.status(400).json({ error: "Invalid task id" });
-    return;
+router.delete("/tasks/:taskId", requireAuth, async (req, res) => {
+  const task = await Task.findById(req.params["taskId"]);
+  if (!task) return res.status(404).json({ success: false, message: "Task not found", code: 404 });
+
+  const project = await Project.findById(task.project).select("owner members");
+  const userId = req.user!.sub;
+  const isAdmin = req.user!.role === "admin";
+  const isOwner = project && String(project.owner) === userId;
+  const membership = project?.members.find((m: any) => String(m.user) === userId && m.role === "admin");
+
+  if (!isAdmin && !isOwner && !membership) {
+    return res.status(403).json({ success: false, message: "Only admins or project owners can delete tasks", code: 403 });
   }
-  const task = await Task.findById(id);
-  if (!task) {
-    res.status(404).json({ error: "Task not found" });
-    return;
-  }
-  if (req.user!.role !== "admin") {
-    const project = await Project.findById(task.project).select("owner");
-    const isOwner = project && String(project.owner) === req.user!.sub;
-    if (!isOwner) {
-      res
-        .status(403)
-        .json({ error: "Only admins or project owner can delete tasks" });
-      return;
-    }
-  }
+
   await task.deleteOne();
-  res.json({ ok: true });
+  res.json({ success: true });
 });
 
 export default router;

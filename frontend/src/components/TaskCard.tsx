@@ -18,8 +18,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { api, getApiErrorMessage } from "@/lib/api";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { api, getApiErrorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const PRIORITY_TONE: Record<string, string> = {
@@ -43,6 +44,7 @@ export function TaskCard({
   showProject,
   onDragStart,
   onDragEnd,
+  projectOwnerId,
 }: {
   task: Task;
   draggable?: boolean;
@@ -50,10 +52,20 @@ export function TaskCard({
   showProject?: boolean;
   onDragStart?: (task: Task) => void;
   onDragEnd?: () => void;
+  projectOwnerId?: string;
 }) {
+  const { user, projectRoles } = useAuth();
   const qc = useQueryClient();
   const { toast } = useToast();
   const due = dueDateLabel(task.dueDate);
+
+  const isAdmin = user?.role === "admin";
+  const isProjectAdmin = projectRoles[task.projectId] === "admin";
+  const isAssignee = user?.id === task.assignee?.id;
+  const isCreator = user?.id === task.createdBy.id;
+
+  const canEdit = isAdmin || isProjectAdmin || isAssignee || isCreator;
+  const canDelete = isAdmin || isProjectAdmin;
 
   const updateStatus = useMutation({
     mutationFn: async (status: TaskStatus) => {
@@ -129,10 +141,12 @@ export function TaskCard({
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-44">
-                <DropdownMenuItem onClick={() => onEdit?.(task)}>
-                  <Pencil className="size-3.5 mr-2" /> Edit task
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
+                {canEdit && (
+                  <DropdownMenuItem onClick={() => onEdit?.(task)}>
+                    <Pencil className="size-3.5 mr-2" /> Edit task
+                  </DropdownMenuItem>
+                )}
+                {canEdit && <DropdownMenuSeparator />}
                 <DropdownMenuItem
                   onClick={() => updateStatus.mutate("todo")}
                   disabled={task.status === "todo"}
@@ -151,13 +165,17 @@ export function TaskCard({
                 >
                   Move to Done
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
-                  onClick={() => deleteTask.mutate()}
-                >
-                  <Trash2 className="size-3.5 mr-2" /> Delete
-                </DropdownMenuItem>
+                {canDelete && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onClick={() => deleteTask.mutate()}
+                    >
+                      <Trash2 className="size-3.5 mr-2" /> Delete
+                    </DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

@@ -1,9 +1,9 @@
 import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
 
-export const TASK_STATUSES = ["todo", "in_progress", "done"] as const;
+export const TASK_STATUSES = ["todo", "in_progress", "in_review", "done"] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 
-export const TASK_PRIORITIES = ["low", "medium", "high"] as const;
+export const TASK_PRIORITIES = ["low", "medium", "high", "critical"] as const;
 export type TaskPriority = (typeof TASK_PRIORITIES)[number];
 
 const taskSchema = new Schema(

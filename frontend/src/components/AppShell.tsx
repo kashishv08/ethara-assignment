@@ -8,6 +8,7 @@ import {
   Sparkles,
   Menu,
   X,
+  Shield,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { AvatarBubble } from "./AvatarBubble";
@@ -19,6 +20,7 @@ const NAV = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/my-tasks", label: "My Tasks", icon: CheckSquare },
+//   { href: "/admin", label: "Admin Panel", icon: Shield, adminOnly: true },
 ];
 
 function basePath() {
@@ -63,7 +65,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
 
       <nav className="flex flex-col gap-1 px-3">
-        {NAV.map(({ href, label, icon: Icon }) => {
+        {NAV.map(({ href, label, icon: Icon, adminOnly }) => {
+          if (adminOnly && user?.role !== "admin") return null;
           const active =
             href === "/"
               ? location === "/" || location === ""

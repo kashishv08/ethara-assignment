@@ -1,45 +1,92 @@
-# Ethara Team Task Manager
+# 🚀 Ethara Team Task Manager
 
-A full-stack collaborative task management application built with the MERN stack (MongoDB, Express, React, Node.js).
+A high-performance, full-stack collaborative task management platform designed for modern teams. This application features a robust **Role-Based Access Control (RBAC)** system, dynamic Kanban boards, and a centralized project dashboard.
 
-## 🚀 Live Demo
-**Live URL**: [Replace with your Railway URL]
+## 🔗 Live Deployment
+**Live URL**: [https://ethara-assignment-production-49a2.up.railway.app](https://ethara-assignment-production-49a2.up.railway.app)
+
+---
+
+## 🔑 Admin Credentials
+Use the following credentials to access the platform with full **Global Admin** privileges:
+
+- **Email**: `tulsi@gmail.com`
+- **Password**: `tulsi123`
+
+---
+
+## 🎭 Role-Based Access Control (RBAC)
+The core of the application is built on a strict permission model to ensure secure collaboration.
+
+### 👑 Admin Role
+*   **System Ownership**: Total control over the entire workspace.
+*   **Project Management**: Create, edit, and archive any project.
+*   **Team Oversight**: View all tasks across all projects and manage any team member.
+*   **User Management**: Access to a dedicated Admin Panel to promote/deactivate users.
+
+### 👥 Member Role
+*   **Focused Access**: Can only view projects they have been specifically added to.
+*   **Task Management**: Can create tasks and edit the details (title, description, priority) of tasks assigned to them.
+*   **Progress Tracking**: Can update the status (To-Do -> In Review -> Done) via a drag-and-drop Kanban board.
+*   **Dashboard Stats**: Personalized view of their own workload and upcoming deadlines.
+
+---
+
+## ✨ Key Features
+- **📊 Adaptive Dashboard**: Real-time stats that change based on your role (Admin vs. Member).
+- **📋 Kanban Board**: Four-stage workflow (To-Do, In Progress, In Review, Done) with drag-and-drop.
+- **🛡️ RBAC UI Guards**: Components automatically hide/show buttons based on project-level permissions.
+- **🔐 Secure Auth**: JWT-based authentication with session persistence.
+- **⚡ Modern UI**: Sleek dark-mode compatible design using Tailwind CSS and Radix UI.
+
+---
 
 ## 🛠️ Tech Stack
-- **Frontend**: React, TypeScript, Vite, Tailwind CSS, Lucide Icons, Shadcn UI, TanStack Query.
-- **Backend**: Node.js, Express, MongoDB (Mongoose), JWT Authentication, Pino (Logging), Zod (Validation).
-- **Deployment**: Railway
+- **Frontend**: React 18, TypeScript, Vite, TanStack Query, Lucide Icons, Tailwind CSS.
+- **Backend**: Node.js, Express 5, MongoDB (Mongoose), JWT, Zod Validation, Pino Logger.
+- **Deployment**: Railway (Unified Full-Stack Deployment).
 
-## 📦 Submission Details
-- **GitHub Repository**: [Replace with your GitHub Repository URL]
-- **Deployment**: [Replace with your Railway URL]
+---
 
-## 🛠️ Local Setup
+## ⚙️ Local Setup
 
 ### 1. Prerequisites
 - Node.js (v20+)
-- MongoDB (Local or Atlas)
+- MongoDB Instance (Local or Atlas)
 
-### 2. Backend Setup
-1. Navigate to the `backend` folder.
-2. Create a `.env` file with:
-   ```env
-   PORT=5000
-   MONGODB_URI=your_mongodb_uri
-   JWT_SECRET=your_secret_key
-   NODE_ENV=development
-   ```
-3. Run `npm install`.
-4. Run `npm run dev`.
+### 2. Installation
+Clone the repository and install dependencies in both folders:
+```bash
+# Install frontend dependencies
+cd frontend && npm install --legacy-peer-deps
 
-### 3. Frontend Setup
-1. Navigate to the `frontend` folder.
-2. Run `npm install`.
-3. Run `npm run dev`.
-4. Open `http://localhost:5173` in your browser.
+# Install backend dependencies
+cd ../backend && npm install --legacy-peer-deps
+```
 
-## 🚢 Production Deployment (Railway)
-The project is configured for unified deployment.
-1. Connect your GitHub repository to Railway.
-2. Set the environment variables (`MONGODB_URI`, `JWT_SECRET`, `NODE_ENV=production`).
-3. Railway will build and serve the application automatically.
+### 3. Environment Configuration
+Create a `.env` file in the `backend` directory:
+```env
+PORT=5000
+MONGODB_URI=your_mongodb_connection_string
+JWT_SECRET=your_super_secret_key
+NODE_ENV=development
+```
+
+### 4. Running the App
+**Development Mode**:
+```bash
+# In backend folder
+npm run dev
+
+# In frontend folder
+npm run dev
+```
+
+---
+
+## 🚢 Production Deployment
+This project uses a **Unified Deployment Strategy**. The root `package.json` contains a specialized build script that compiles the frontend and prepares the backend to serve it as a single service.
+
+**Build Command**: `npm run build`
+**Start Command**: `npm start`

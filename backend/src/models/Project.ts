@@ -13,10 +13,20 @@ const projectSchema = new Schema(
     },
     members: [
       {
-        type: Schema.Types.ObjectId,
-        ref: "User",
+        user: { type: Schema.Types.ObjectId, ref: "User" },
+        role: {
+          type: String,
+          enum: ["admin", "member"],
+          default: "member",
+        },
       },
     ],
+    status: {
+      type: String,
+      enum: ["active", "archived"],
+      default: "active",
+      index: true,
+    },
   },
   { timestamps: true },
 );

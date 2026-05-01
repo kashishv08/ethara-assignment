@@ -103,9 +103,9 @@ export function ProjectCard({
           <div className="flex -space-x-2">
             {project.members.slice(0, 4).map((m) => (
               <AvatarBubble
-                key={m.id}
-                name={m.name}
-                color={m.avatarColor}
+                key={m.user?.id}
+                name={m.user?.name ?? "Unknown"}
+                color={m.user?.avatarColor}
                 size="sm"
               />
             ))}

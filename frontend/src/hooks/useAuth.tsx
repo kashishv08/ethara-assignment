@@ -14,16 +14,23 @@ interface AuthContextValue {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<User>;
-  signup: (name: string, email: string, password: string) => Promise<User>;
+  signup: (name: string, email: string, password: string, role?: string) => Promise<User>;
   logout: () => void;
   refresh: () => Promise<void>;
+  projectRoles: Record<string, "admin" | "member">;
+  updateProjectRole: (projectId: string, role: "admin" | "member") => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [projectRoles, setProjectRoles] = useState<Record<string, "admin" | "member">>({});
   const [loading, setLoading] = useState(true);
+
+  const updateProjectRole = useCallback((projectId: string, role: "admin" | "member") => {
+    setProjectRoles(prev => ({ ...prev, [projectId]: role }));
+  }, []);
 
   const refresh = useCallback(async () => {
     if (!getToken()) {
@@ -64,11 +71,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const signup = useCallback(
-    async (name: string, email: string, password: string) => {
+    async (name: string, email: string, password: string, role?: string) => {
       try {
         const { data } = await api.post<{ token: string; user: User }>(
           "/auth/signup",
-          { name, email, password },
+          { name, email, password, role },
         );
         setToken(data.token);
         setUser(data.user);
@@ -86,8 +93,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, loading, login, signup, logout, refresh }),
-    [user, loading, login, signup, logout, refresh],
+    () => ({ user, loading, login, signup, logout, refresh, projectRoles, updateProjectRole }),
+    [user, loading, login, signup, logout, refresh, projectRoles, updateProjectRole],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -27,6 +27,12 @@ const COLUMNS: {
     badge: "bg-amber-500/10 text-amber-600 dark:text-amber-300",
   },
   {
+    id: "in_review",
+    label: "In Review",
+    accent: "from-fuchsia-500 to-pink-500",
+    badge: "bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-300",
+  },
+  {
     id: "done",
     label: "Done",
     accent: "from-emerald-500 to-teal-500",
@@ -38,10 +44,12 @@ export function KanbanBoard({
   tasks,
   onEditTask,
   onAddTask,
+  projectOwnerId,
 }: {
   tasks: Task[];
   onEditTask: (task: Task) => void;
   onAddTask: (status: TaskStatus) => void;
+  projectOwnerId?: string;
 }) {
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -68,7 +76,7 @@ export function KanbanBoard({
   });
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {COLUMNS.map((col) => {
         const list = tasks.filter((t) => t.status === col.id);
         return (
@@ -138,6 +146,7 @@ export function KanbanBoard({
                     task={task}
                     draggable
                     onEdit={onEditTask}
+                    projectOwnerId={projectOwnerId}
                   />
                 ))
               )}

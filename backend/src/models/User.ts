@@ -19,6 +19,7 @@ const userSchema = new Schema(
       required: true,
     },
     avatarColor: { type: String, default: "#6366f1" },
+    isActive: { type: Boolean, default: true },
   },
   { timestamps: true },
 );
@@ -40,6 +41,7 @@ export function publicUser(user: UserDoc) {
     email: user.email,
     role: user.role,
     avatarColor: user.avatarColor,
+    isActive: user.isActive !== false,
     createdAt: user.createdAt,
   };
 }

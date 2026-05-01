@@ -15,6 +15,7 @@ import type { Project, Task, TaskStatus } from "@/lib/types";
 import { KanbanBoard } from "@/components/KanbanBoard";
 import { TaskFormModal } from "@/components/TaskFormModal";
 import { ProjectFormModal } from "@/components/ProjectFormModal";
+import { ProjectAdminOnly } from "@/components/guards/RBACGuards";
 import { AvatarBubble } from "@/components/AvatarBubble";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +24,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 
 export default function ProjectDetailPage({ projectId }: { projectId: string }) {
-  const { user } = useAuth();
+  const { user, updateProjectRole } = useAuth();
   const [, navigate] = useLocation();
   const [taskOpen, setTaskOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -33,9 +34,12 @@ export default function ProjectDetailPage({ projectId }: { projectId: string }) 
   const projectQuery = useQuery({
     queryKey: ["project", projectId],
     queryFn: async () => {
-      const { data } = await api.get<{ project: Project }>(
+      const { data } = await api.get<{ project: Project; myRole: "admin" | "member" }>(
         `/projects/${projectId}`,
       );
+      if (data.myRole) {
+        updateProjectRole(projectId, data.myRole);
+      }
       return data.project;
     },
   });
@@ -146,7 +150,7 @@ export default function ProjectDetailPage({ projectId }: { projectId: string }) 
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {canEdit && (
+            <ProjectAdminOnly projectId={projectId}>
               <Button
                 variant="outline"
                 onClick={() => setEditProjectOpen(true)}
@@ -155,18 +159,21 @@ export default function ProjectDetailPage({ projectId }: { projectId: string }) 
               >
                 <Pencil className="size-4 mr-1.5" /> Edit project
               </Button>
-            )}
-            <Button
-              onClick={() => {
-                setEditingTask(null);
-                setDefaultStatus("todo");
-                setTaskOpen(true);
-              }}
-              className="gradient-primary text-white"
-              data-testid="button-add-task"
-            >
-              <Plus className="size-4 mr-1.5" /> Add task
-            </Button>
+            </ProjectAdminOnly>
+
+            <ProjectAdminOnly projectId={projectId}>
+              <Button
+                onClick={() => {
+                  setEditingTask(null);
+                  setDefaultStatus("todo");
+                  setTaskOpen(true);
+                }}
+                className="gradient-primary text-white"
+                data-testid="button-add-task"
+              >
+                <Plus className="size-4 mr-1.5" /> Add task
+              </Button>
+            </ProjectAdminOnly>
           </div>
         </div>
 
@@ -212,9 +219,9 @@ export default function ProjectDetailPage({ projectId }: { projectId: string }) 
           <div className="flex -space-x-2">
             {project.members.map((m) => (
               <AvatarBubble
-                key={m.id}
-                name={m.name}
-                color={m.avatarColor}
+                key={m.user?.id}
+                name={m.user?.name ?? "Unknown"}
+                color={m.user?.avatarColor}
                 size="sm"
               />
             ))}
@@ -235,6 +242,7 @@ export default function ProjectDetailPage({ projectId }: { projectId: string }) 
             setDefaultStatus(status);
             setTaskOpen(true);
           }}
+          projectOwnerId={project.owner.id}
         />
       </div>
 

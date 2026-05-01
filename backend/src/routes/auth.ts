@@ -47,7 +47,7 @@ router.post("/auth/signup", async (req, res) => {
   }
   const passwordHash = await hashPassword(password);
   const isFirstUser = (await User.estimatedDocumentCount()) === 0;
-  const finalRole = role ?? (isFirstUser ? "admin" : "member");
+  const finalRole = isFirstUser ? "admin" : (role || "member");
   const avatarColor = COLORS[Math.floor(Math.random() * COLORS.length)] ?? "#6366f1";
   const user = await User.create({
     name,
