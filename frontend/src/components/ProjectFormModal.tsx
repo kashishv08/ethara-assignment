@@ -52,7 +52,7 @@ export function ProjectFormModal({
       setName(project?.name ?? "");
       setDescription(project?.description ?? "");
       setColor(project?.color ?? COLORS[0]!);
-      setMemberIds(project?.members.map((m) => m.id) ?? []);
+      setMemberIds(project?.members.map((m) => m.user.id) ?? []);
     }
   }, [open, project]);
 

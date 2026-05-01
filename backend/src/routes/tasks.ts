@@ -53,15 +53,15 @@ function serializeTask(t: any) {
           }
         : undefined,
     assignee:
-      t.assignee && typeof t.assignee === "object" && "email" in t.assignee
+      t.assignee && typeof t.assignee === "object" && t.assignee !== null && "email" in t.assignee
         ? publicUser(t.assignee)
         : t.assignee
-        ? { id: String(t.assignee) }
+        ? { id: String(t.assignee._id || t.assignee) }
         : null,
     createdBy:
-      t.createdBy && typeof t.createdBy === "object" && "email" in t.createdBy
+      t.createdBy && typeof t.createdBy === "object" && t.createdBy !== null && "email" in t.createdBy
         ? publicUser(t.createdBy)
-        : { id: String(t.createdBy) },
+        : { id: String(t.createdBy?._id || t.createdBy) },
     createdAt: t.createdAt,
     updatedAt: t.updatedAt,
   };
@@ -98,12 +98,17 @@ router.get("/tasks", requireAuth, async (req, res) => {
     }
   } else {
     // Return tasks from all accessible projects
+    const userObjectId = new mongoose.Types.ObjectId(req.user!.sub);
     const accessibleProjects =
       req.user!.role === "admin"
         ? await Project.find().select("_id")
         : await Project.find({
-            $or: [{ owner: req.user!.sub }, { "members.user": req.user!.sub }],
-          }).select("_id members.user members.role");
+            $or: [
+              { owner: userObjectId }, 
+              { "members.user": userObjectId },
+              { "members": userObjectId }
+            ],
+          }).select("_id owner members");
 
     const projectIds = accessibleProjects.map((p) => p._id);
     
@@ -111,16 +116,26 @@ router.get("/tasks", requireAuth, async (req, res) => {
       filter["project"] = { $in: projectIds };
     } else {
       // Complex filter: tasks where (project is owned) OR (project is member AND assigned to me)
+      const userId = req.user!.sub;
       const ownedProjectIds = (accessibleProjects as any[])
-        .filter(p => String(p.owner) === req.user!.sub)
+        .filter(p => String(p.owner) === userId)
         .map(p => p._id);
       
       const memberProjectIds = (accessibleProjects as any[])
-        .filter(p => p.members.some((m: any) => String(m.user) === req.user!.sub && m.role === "member"))
+        .filter(p => p.members.some((m: any) => {
+          const mUserId = String(m.user || m);
+          const mRole = m.role || "member";
+          return mUserId === userId && mRole === "member";
+        }))
         .map(p => p._id);
 
       const adminProjectIds = (accessibleProjects as any[])
-        .filter(p => p.members.some((m: any) => String(m.user) === req.user!.sub && m.role === "admin"))
+        .filter(p => p.members.some((m: any) => {
+          const mUserId = String(m.user || m);
+          const mRole = m.role || "admin"; // Default to admin for owner-like flat lists? No, default to member.
+          // Wait, if it's a flat list, we can't tell if they are admin.
+          return mUserId === userId && mRole === "admin";
+        }))
         .map(p => p._id);
 
       filter["$or"] = [
@@ -156,6 +171,14 @@ router.post("/tasks", requireAuth, checkProjectMembership, isProjectAdmin, async
     return;
   }
   const { projectId, assigneeId, dueDate, ...rest } = parsed.data;
+
+  // Restriction: Members cannot assign tasks to admins
+  if (req.user!.role === "member" && assigneeId) {
+    const assignee = await User.findById(assigneeId);
+    if (assignee?.role === "admin") {
+      return res.status(403).json({ success: false, message: "Members cannot assign tasks to admins", code: 403 });
+    }
+  }
   
   const task = await Task.create({
     ...rest,
@@ -212,22 +235,19 @@ router.patch("/tasks/:taskId", requireAuth, async (req, res) => {
   if (!parsed.success) return res.status(400).json({ success: false, message: "Invalid input", code: 400 });
 
   if (projectRole === "member") {
-    // Members can update details of tasks assigned to them
+    // Members can ONLY update status of tasks assigned to them
     if (!isAssignee) {
       return res.status(403).json({ success: false, message: "You can only modify your own tasks", code: 403 });
     }
     
-    const { title, description, status, priority, dueDate } = parsed.data;
-    if (title) task.title = title;
-    if (description !== undefined) task.description = description;
-    if (status) task.status = status;
-    if (priority) task.priority = priority;
-    if (dueDate !== undefined) task.dueDate = dueDate ? new Date(dueDate) : null;
-
-    // Prevent re-assignment by members
-    if (req.body.assigneeId !== undefined && req.body.assigneeId !== userId && req.body.assigneeId !== null) {
-      return res.status(403).json({ success: false, message: "Members cannot re-assign tasks", code: 403 });
+    const { status } = parsed.data;
+    const { title, description, priority, dueDate } = req.body;
+    
+    if (title || description !== undefined || priority || dueDate !== undefined) {
+      return res.status(403).json({ success: false, message: "Members can only update task status", code: 403 });
     }
+
+    if (status) task.status = status;
   } else {
     // Admin/Owner can update anything
     const { assigneeId, dueDate, ...rest } = parsed.data;

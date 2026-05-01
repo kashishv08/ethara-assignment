@@ -20,7 +20,7 @@ const NAV = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/my-tasks", label: "My Tasks", icon: CheckSquare },
-//   { href: "/admin", label: "Admin Panel", icon: Shield, adminOnly: true },
+  // { href: "/admin", label: "Admin Panel", icon: Shield, adminOnly: true },
 ];
 
 function basePath() {

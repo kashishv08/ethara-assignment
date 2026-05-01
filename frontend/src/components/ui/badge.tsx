@@ -20,6 +20,8 @@ const badgeVariants = cva(
         destructive:
           // @replit shadow-xs instead of shadow, no hover because we use hover-elevate
           "border-transparent bg-destructive text-destructive-foreground shadow-xs",
+        success:
+          "border-transparent bg-emerald-500 text-white shadow-xs",
           // @replit shadow-xs" - use badge outline variable
         outline: "text-foreground border [border-color:var(--badge-outline)]",
       },

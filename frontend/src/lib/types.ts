@@ -66,6 +66,8 @@ export interface DashboardResponse {
     inProgress?: number;
     overdueCount: number;
     projectsCount?: number;
+    activeProjects?: number;
+    archivedProjects?: number;
   };
   overdueTasks: {
     id: string;

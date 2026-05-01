@@ -60,11 +60,6 @@ export async function checkProjectMembership(
 
   const userId = req.user!.sub;
   
-  // Check global admin
-  if (req.user!.role === "admin") {
-    req.projectRole = "admin";
-    return next();
-  }
 
   // Check owner
   if (String(project.owner) === userId) {
@@ -74,7 +69,7 @@ export async function checkProjectMembership(
 
   // Check members array
   const membership = project.members.find(
-    (m: any) => String(m.user) === userId,
+    (m: any) => String(m.user || m) === userId,
   );
 
   if (!membership) {

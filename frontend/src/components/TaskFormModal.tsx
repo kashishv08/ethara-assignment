@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { api, getApiErrorMessage } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import type { Project, Task, TaskPriority, TaskStatus, User } from "@/lib/types";
 
 export function TaskFormModal({
@@ -45,6 +46,7 @@ export function TaskFormModal({
   const [assigneeId, setAssigneeId] = useState<string>("__unassigned");
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
 
+  const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
 
@@ -247,11 +249,19 @@ export function TaskFormModal({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__unassigned">Unassigned</SelectItem>
-                  {membersQuery.data?.map((u) => (
-                    <SelectItem key={u.id} value={u.id}>
-                      {u.name}
-                    </SelectItem>
-                  ))}
+                  {membersQuery.data
+                    ?.filter((u) => {
+                      // Restriction: Members can't assign to admins
+                      if (user?.role === "member" && u.role === "admin") return false;
+                      // Restriction: Admins can't assign to OTHER admins
+                      if (user?.role === "admin" && u.role === "admin" && u.id !== user?.id) return false;
+                      return true;
+                    })
+                    .map((u) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>

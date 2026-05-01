@@ -112,33 +112,33 @@ export default function Dashboard() {
         {isDashAdmin ? (
           <>
             <StatCard
-              label="Total Tasks"
-              value={d?.stats.total ?? 0}
-              hint={`${d?.stats.projectsCount ?? 0} projects`}
+              label="Total Projects"
+              value={d?.stats.projectsCount ?? 0}
+              hint="Total managed"
               icon={FolderKanban}
               tone="indigo"
               loading={dashQuery.isLoading}
             />
             <StatCard
-              label="Completed"
-              value={d?.stats.done ?? 0}
-              hint="Across all projects"
-              icon={CheckCircle2}
-              tone="emerald"
-              loading={dashQuery.isLoading}
-            />
-            <StatCard
-              label="Active Members"
-              value={d?.memberBreakdown?.length ?? 0}
-              hint="Working on tasks"
+              label="In Progress"
+              value={d?.stats.activeProjects ?? 0}
+              hint="Active projects"
               icon={Users}
               tone="amber"
               loading={dashQuery.isLoading}
             />
             <StatCard
-              label="Overdue"
-              value={d?.stats.overdueCount ?? 0}
-              hint="Urgent attention needed"
+              label="Completed"
+              value={d?.stats.archivedProjects ?? 0}
+              hint="Archived projects"
+              icon={CheckCircle2}
+              tone="emerald"
+              loading={dashQuery.isLoading}
+            />
+            <StatCard
+              label="Total Tasks"
+              value={d?.stats.total ?? 0}
+              hint="System wide"
               icon={AlertTriangle}
               tone="rose"
               loading={dashQuery.isLoading}

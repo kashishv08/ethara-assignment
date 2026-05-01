@@ -17,6 +17,7 @@ const createProjectSchema = z.object({
   name: z.string().min(1).max(120),
   description: z.string().max(2000).optional().default(""),
   color: z.string().optional(),
+  memberIds: z.array(z.string()).optional(),
 });
 
 const updateProjectSchema = z.object({
@@ -24,6 +25,7 @@ const updateProjectSchema = z.object({
   description: z.string().max(2000).optional(),
   color: z.string().optional(),
   status: z.enum(["active", "archived"]).optional(),
+  memberIds: z.array(z.string()).optional(),
 });
 
 const COLORS = [
@@ -51,9 +53,9 @@ function serializeProject(p: any) {
     members: Array.isArray(p.members)
       ? p.members.map((m: any) => {
           const u = m.user || m;
-          const isPopulated = u && typeof u === "object" && "email" in u;
+          const isPopulated = u && typeof u === "object" && u !== null && "email" in u;
           return {
-            user: isPopulated ? publicUser(u) : { id: String(u._id || u) },
+            user: isPopulated ? publicUser(u) : { id: String(u?._id || u) },
             role: m.role || "member",
           };
         })
@@ -65,16 +67,16 @@ function serializeProject(p: any) {
 
 router.get("/projects", requireAuth, async (req, res) => {
   const userId = req.user!.sub;
-  const filter =
-    req.user!.role === "admin"
-      ? {}
-      : { 
-          $or: [
-            { owner: userId }, 
-            { "members.user": userId }
-          ],
-          status: "active" // Members only see active projects
-        };
+  const userObjectId = new mongoose.Types.ObjectId(userId);
+  const filter = { 
+    $or: [
+      { owner: userObjectId }, 
+      { "members.user": userObjectId },
+      { "members": userObjectId }
+    ],
+    // Members only see active projects, Owners (Admins) see all their projects
+    ...(req.user!.role !== "admin" ? { status: "active" } : {})
+  };
 
   const projects = await Project.find(filter)
     .sort({ updatedAt: -1 })
@@ -119,13 +121,23 @@ router.post("/projects", requireAuth, async (req, res) => {
     res.status(400).json({ success: false, message: "Invalid input", code: 400 });
     return;
   }
-  const { name, description, color } = parsed.data;
+  const { name, description, color, memberIds } = parsed.data;
+  
+  const members = [{ user: new mongoose.Types.ObjectId(req.user!.sub), role: "admin" }];
+  if (memberIds && Array.isArray(memberIds)) {
+    for (const id of memberIds) {
+      if (id !== req.user!.sub && mongoose.isValidObjectId(id)) {
+        members.push({ user: new mongoose.Types.ObjectId(id), role: "member" });
+      }
+    }
+  }
+
   const project = await Project.create({
     name,
     description,
     color: color ?? COLORS[Math.floor(Math.random() * COLORS.length)],
     owner: req.user!.sub,
-    members: [{ user: req.user!.sub, role: "admin" }],
+    members,
   });
   const populated = await Project.findById(project._id)
     .populate("owner")
@@ -154,11 +166,22 @@ router.patch("/projects/:projectId", requireAuth, checkProjectMembership, isProj
   const project = await Project.findById(req.params["projectId"]);
   if (!project) return res.status(404).json({ success: false, message: "Project not found", code: 404 });
 
-  const { name, description, color, status } = parsed.data;
+  const { name, description, color, status, memberIds } = parsed.data;
   if (name !== undefined) project.name = name;
   if (description !== undefined) project.description = description;
   if (color !== undefined) project.color = color;
   if (status !== undefined) project.status = status as any;
+  
+  if (memberIds !== undefined) {
+    const ownerId = String(project.owner);
+    const newMembers = [{ user: new mongoose.Types.ObjectId(ownerId), role: "admin" }];
+    for (const id of memberIds) {
+      if (id !== ownerId && mongoose.isValidObjectId(id)) {
+        newMembers.push({ user: new mongoose.Types.ObjectId(id), role: "member" });
+      }
+    }
+    project.members = newMembers as any;
+  }
 
   await project.save();
   const populated = await Project.findById(project._id)

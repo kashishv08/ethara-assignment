@@ -64,7 +64,8 @@ export function TaskCard({
   const isAssignee = user?.id === task.assignee?.id;
   const isCreator = user?.id === task.createdBy.id;
 
-  const canEdit = isAdmin || isProjectAdmin || isAssignee || isCreator;
+  const canEditFull = isAdmin || isProjectAdmin || isCreator;
+  const canMove = canEditFull || isAssignee;
   const canDelete = isAdmin || isProjectAdmin;
 
   const updateStatus = useMutation({
@@ -141,30 +142,36 @@ export function TaskCard({
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-44">
-                {canEdit && (
-                  <DropdownMenuItem onClick={() => onEdit?.(task)}>
-                    <Pencil className="size-3.5 mr-2" /> Edit task
-                  </DropdownMenuItem>
+                {canEditFull && (
+                  <>
+                    <DropdownMenuItem onClick={() => onEdit?.(task)}>
+                      <Pencil className="size-3.5 mr-2" /> Edit task
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
                 )}
-                {canEdit && <DropdownMenuSeparator />}
-                <DropdownMenuItem
-                  onClick={() => updateStatus.mutate("todo")}
-                  disabled={task.status === "todo"}
-                >
-                  Move to To Do
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => updateStatus.mutate("in_progress")}
-                  disabled={task.status === "in_progress"}
-                >
-                  Move to In Progress
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => updateStatus.mutate("done")}
-                  disabled={task.status === "done"}
-                >
-                  Move to Done
-                </DropdownMenuItem>
+                {canMove && (
+                  <>
+                    <DropdownMenuItem
+                      onClick={() => updateStatus.mutate("todo")}
+                      disabled={task.status === "todo"}
+                    >
+                      Move to To Do
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => updateStatus.mutate("in_progress")}
+                      disabled={task.status === "in_progress"}
+                    >
+                      Move to In Progress
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => updateStatus.mutate("done")}
+                      disabled={task.status === "done"}
+                    >
+                      Move to Done
+                    </DropdownMenuItem>
+                  </>
+                )}
                 {canDelete && (
                   <>
                     <DropdownMenuSeparator />
