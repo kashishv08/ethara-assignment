@@ -13,6 +13,7 @@
     "bcryptjs": "^3.0.2",
     "cookie-parser": "^1.4.7",
     "cors": "^2",
+    "ethara-assignment": "file:..",
     "express": "^5",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.18.0",
