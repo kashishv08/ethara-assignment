@@ -37,7 +37,7 @@ if (process.env.NODE_ENV === "production") {
   const publicPath = path.resolve(process.cwd(), "public");
   if (fs.existsSync(publicPath)) {
     app.use(express.static(publicPath));
-    app.get("*", (req, res) => {
+    app.get("(.*)", (req, res) => {
       if (!req.path.startsWith("/api")) {
         res.sendFile(path.join(publicPath, "index.html"));
       }
