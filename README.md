@@ -7,14 +7,6 @@ A high-performance, full-stack collaborative task management platform designed f
 
 ---
 
-## 🔑 Admin Credentials
-Use the following credentials to access the platform with full **Global Admin** privileges:
-
-- **Email**: `tulsi@gmail.com`
-- **Password**: `tulsi123`
-
----
-
 ## 🎭 Role-Based Access Control (RBAC)
 The core of the application is built on a strict permission model to ensure secure collaboration.
 
